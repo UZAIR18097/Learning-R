@@ -1,0 +1,129 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+5.1 Testing Two-Sided Hypotheses Concerning
+the Slope Coefficient
+```{r}
+library(AER)
+library(scales)
+```
+```{r}
+# load the `CASchools` dataset
+data(CASchools)
+# add student-teacher ratio
+CASchools$STR <- CASchools$students/CASchools$teachers
+# add average test-score
+CASchools$score <- (CASchools$read + CASchools$math)/2
+# estimate the model
+linear_model <- lm(score ~ STR, data = CASchools)
+```
+```{r}
+# print the summary of the coefficients to the console
+summary(linear_model)$coefficients
+```
+That is, the observed test statistic falls into the rejection region as p-value =
+2.78 · 10−6 < 0.05. We conclude that the coefficient is significantly different
+from zero. In other words, we reject the hypothesis that the class size has no
+influence on the students test scores at the 5% level.
+```{r}
+# determine residual degrees of freedom
+linear_model$df.residual
+```
+p-value for a two-sided significance test can be obtained by executing
+the following
+```{r}
+2 * pt(-4.751327, df = 418)
+```
+However since n
+is sufficiently large one could just as well use the standard normal density to
+compute the p-value:
+```{r}
+2 * pnorm(-4.751327)
+```
+Plotting the rejection region and pvalues
+```{r}
+draw_cr <- function(type = "two-tailed", df, cv, lowerx = -5, upperx = 5) {
+  x <- seq(lowerx, upperx, len = 1000)
+  dx <- dt(x, df = df)
+  plot(x, dx, xlab = "test value", ylab = "density", type = "l")
+  abline(h = 0)
+
+  if(type == "left-tailed") {
+    cvx <- seq(lowerx, cv, len = 100)
+    cvx2 <- c(cvx, rev(cvx))
+    dcvx <- dt(cvx, df = df)
+    dcvx2 <- c(dcvx, rep(0, length(cvx)))
+    polygon(cvx2, dcvx2, col = "grey")
+  }else if (type == "right-tailed") {
+    cvx <- seq(cv, upperx, len = 100)
+    cvx2 <- c(cvx, rev(cvx))
+    dcvx <- dt(cvx, df = df)
+    dcvx2 <- c(dcvx, rep(0, length(cvx)))
+    polygon(cvx2, dcvx2, col = "grey")
+  }else {
+    cvx <- seq(lowerx, -abs(cv), len = 100)
+    cvx2 <- c(cvx, rev(cvx))
+    dcvx <- dt(cvx, df = df)
+    dcvx2 <- c(dcvx, rep(0, length(cvx)))
+    polygon(cvx2, dcvx2, col = "grey")
+    cvx <- seq(abs(cv), upperx, len = 100)
+    cvx2 <- c(cvx, rev(cvx))
+    dcvx <- dt(cvx, df = df)
+    dcvx2 <- c(dcvx, rep(0, length(cvx)))
+    polygon(cvx2, dcvx2, col = "grey")
+  }
+  
+  legend("topright", c("RR", "non-RR"), fill = c("grey", "white"))
+}
+```
+```{r}
+draw_cr("two-tailed",df =2 ,1.96)
+```
+The p-Value is the area under the curve to left of −4.75 plus the area under the
+curve to the right of 4.75. As we already know from the calculations above, this
+value is very small.
+
+5.2 Confidence Intervals for Regression Coefficients
+```{r}
+# compute 95% confidence interval for coefficients in 'linear_model'
+confint(linear_model)
+```
+5.3 Regression when X is a Binary Variable
+```{r}
+# Create the dummy variable as defined above
+CASchools$D <- CASchools$STR < 20
+
+# Plot the data
+plot(CASchools$D, CASchools$score, # provide the data to be plotted
+pch = 20, # use filled circles as plot symbols
+cex = 0.5, # set size of plot symbols to 0.5
+col = "Steelblue", # set the symbols' color to "Steelblue"
+xlab = expression(D[i]), # Set title and axis names
+ylab = "Test Score",
+main = "Dummy Regression")
+```
+```{r}
+# estimate the dummy regression model
+dummy_model <- lm(score ~ D, data = CASchools)
+summary(dummy_model)
+```
+```{r}
+typeof(CASchools$D)
+```
+One can see that the expected test score in districts with STR < 20 (Di = 1) is
+predicted to be 650.1 + 7.17 = 657.27 while districts with STR  20 (Di = 0)
+are expected to have an average test score of only 650.1.
+```{r}
+# confidence intervals for coefficients in the dummy regression model
+confint(dummy_model)
+```
+We reject the hypothesis that there is no difference between group means at the
+5% significance level since 1,0 = 0 lies outside of [3.54, 10.8], the 95% confidence
+interval for the coefficient on D.
+
+
+
+
+
+

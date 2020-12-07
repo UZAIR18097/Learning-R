@@ -1,0 +1,107 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+```{r}
+library(AER)
+library(MASS)
+library(ggfortify)
+```
+
+```{r}
+# load the data set
+data(CASchools)
+```
+```{r}
+#summarize data
+print(summary(Boston))
+
+print(str(Boston))
+
+print(head(Boston))
+
+```
+
+```{r}
+# define variables
+CASchools$STR <- CASchools$students/CASchools$teachers
+CASchools$score <- (CASchools$read + CASchools$math)/2
+```
+```{r}
+#compute correlations
+cor(CASchools$STR,CASchools$score)
+cor(CASchools$STR,CASchools$english)
+```
+```{r}
+# estimate both regression models
+mod <- lm(score ~ STR, data = CASchools)
+mult.mod <- lm(score ~ STR + english, data = CASchools)
+```
+```{r}
+#print the results of single var regression
+#print the results of multi var regression
+print(summary(mod))
+print(summary(mult.mod))
+```
+```{r}
+# obtain a robust coefficient summary
+coeftest(mod, vcov. = vcovHC)
+```
+
+
+
+
+```{r}
+#seeing the diagnoistic plots
+resi <- autoplot(mod)
+ggsave(filename = "residuals.jpeg",plot = resi)
+```
+```{r}
+png("mult.mod.png")
+multi_plot <- autoplot(mult.mod)
+print(multi_plot)
+dev.off()
+```
+Including PctEL as a regressor improves the ¯R2, which we deem to be more
+reliable in view of the above discussion. Notice that the difference between R2
+and ¯R2 is small since k = 2 and n is large. In short, the fit of (6.6) improves
+vastly on the fit of the simple regression model with STR as the only regressor.
+Comparing regression errors we find that the precision of the multiple regression
+model (6.6) improves upon the simple model as adding PctEL lowers the SER
+from 18.6 to 14.5 units of test score.
+
+MULTI- COLLINEARITY
+Multicollinearity means that two or more regressors in a multiple regression
+model are strongly correlated.
+
+```{r}
+# define the fraction of English learners
+CASchools$FracEL <- CASchools$english / 100
+# estimate the model
+mult.mod <- lm(score ~ STR + english + FracEL, data = CASchools)
+# obtain a summary of the model
+summary(mult.mod)
+```
+```{r}
+#if STR smaller 12, NS = 0, else NS = 1
+CASchools$NS <- ifelse(CASchools$STR < 12, 0, 1)
+# estimate the model
+mult.mod <- lm(score ~ computer + english + NS, data = CASchools)
+# obtain a model summary
+summary(mult.mod)
+```
+
+This is an example where we made a logical mistake when defining the regressor
+NS: taking a closer look at NS, the redefined measure for class size, reveals
+that there is not a single school with STR < 12 hence NS equals one for all
+observations.
+
+We can  see this:
+```{r}
+table(CASchools$NS)
+```
+Since the regressors can be written as a linear combination of each other, we face perfect multicollinearity and R excludes NS from the model.
+
+
+
+

@@ -1,0 +1,129 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+The Demand for Economic Journals
+The idea here is to analyze the relationship between the number of subscription to a journal at U.S. libraries and the journal’s subscription price.
+```{r}
+# load package and the data set
+library(AER)
+data("Journals")
+```
+```{r}
+summary(Journals)
+```
+
+We measure the price as “price per citation” and compute journal age and the
+number of characters manually. For consistency with the book we also rename
+the variables.
+```{r}
+# define and rename variables
+Journals$PricePerCitation <- Journals$price/Journals$citations
+Journals$Age <- 2000 - Journals$foundingyear
+Journals$Characters <- Journals$charpp * Journals$pages/10^6
+Journals$Subscriptions <- Journals$subs
+```
+```{r}
+# compute summary statistics for price per citation
+summary(Journals$PricePerCitation)
+```
+The range of "price per citation" is quite large.
+We now estimate four different model specifications. All models are log-log
+models. This is useful because it allows us to directly interpret the coefficients
+as elasticities, see Key Concept 8.2. (I) is a linear model. To alleviate a possible omitted variable bias, (II) augments (I) by the covariates ln(Age) and
+ln(Characters). The largest model (III) attempts to capture nonlinearities in
+the relationship of ln(Subscriptions) and ln(PricePerCitation) using a cubic
+regression function of ln(PricePerCitation) and also adds the interaction term
+(PricePerCitation × Age) while specification (IV ) does not include the cubic
+term.
+```{r}
+# Estimate models (I) - (IV)
+Journals_mod1 <- lm(log(Subscriptions) ~ log(PricePerCitation),data = Journals)
+Journals_mod2 <- lm(log(Subscriptions) ~ log(PricePerCitation)+ log(Age) + log(Characters),data = Journals)
+Journals_mod3 <- lm(log(Subscriptions) ~log(PricePerCitation) + I(log(PricePerCitation)^2)+ I(log(PricePerCitation)^3) + log(Age)+ log(Age):log(PricePerCitation) + log(Characters),
+data = Journals)
+Journals_mod4 <- lm(log(Subscriptions) ~log(PricePerCitation) + log(Age)+ log(Age):log(PricePerCitation) +
+log(Characters),
+data = Journals)
+```
+
+
+```{r}
+print(summary(Journals_mod1))
+print(summary(Journals_mod2))
+print(summary(Journals_mod3))
+print(summary(Journals_mod4))
+```
+We use an F-Test to test if the transformations of ln(PriceP erCitation) in
+Model (III) are statistically significant.
+```{r}
+# F-Test for significance of cubic terms
+linearHypothesis(Journals_mod3,
+c("I(log(PricePerCitation)^2)=0", "I(log(PricePerCitation)^3)=0"),vcov. = vcovHC, type = "HC1")
+```
+
+Clearly, we cannot reject the null hypothesis H0 : B3 = B4 = 0 in model (III).
+```{r}
+# load the stargazer package
+library(stargazer)
+# gather robust standard errors in a list
+rob_se <- list(sqrt(diag(vcovHC(Journals_mod1, type = "HC1"))),
+sqrt(diag(vcovHC(Journals_mod2, type = "HC1"))),
+sqrt(diag(vcovHC(Journals_mod3, type = "HC1"))),
+sqrt(diag(vcovHC(Journals_mod4, type = "HC1"))))
+
+# generate a Latex table using stargazer
+stargazer(Journals_mod1, Journals_mod2, Journals_mod3, Journals_mod4,
+se = rob_se,
+digits = 3,
+header = F,
+type = "html",
+title = "RESULTS",
+dep.var.labels=c("Subscriptions"),
+align=TRUE,
+out = "Subscription.html",
+column.labels = c("(I)", "(II)", "(III)", "(IV)"))
+```
+```{r}
+# divide plotting area
+m <- rbind(c(1, 2), c(3, 0))
+graphics::layout(m)
+# scatterplot
+plot(Journals$PricePerCitation,
+Journals$Subscriptions,
+pch = 20,
+col = "steelblue",
+ylab = "Subscriptions",
+xlab = "ln(Price per ciation)",
+main = "(a)")
+# log-log scatterplot and estimated regression line (I)
+plot(log(Journals$PricePerCitation),
+log(Journals$Subscriptions),
+pch = 20,
+col = "steelblue",
+ylab = "ln(Subscriptions)",
+xlab = "ln(Price per ciation)",
+main = "(b)")
+abline(Journals_mod1,
+lwd = 1.5)
+# log-log scatterplot and regression lines (IV) for Age = 5 and Age = 80
+plot(log(Journals$PricePerCitation),
+log(Journals$Subscriptions),
+pch = 20,
+col = "steelblue",
+ylab = "ln(Subscriptions)",
+xlab = "ln(Price per ciation)",
+main = "(c)")
+JM4C <-Journals_mod4$coefficients
+# Age = 80
+abline(coef = c(JM4C[1] + JM4C[3] * log(80),
+JM4C[2] + JM4C[5] * log(80)),
+col = "darkred",
+lwd = 1.5)
+# Age = 5
+abline(coef = c(JM4C[1] + JM4C[3] * log(5),
+JM4C[2] + JM4C[5] * log(5)),
+col = "darkgreen",
+lwd = 1.5)
+```
+

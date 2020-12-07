@@ -1,0 +1,157 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+```{r}
+# load scales package for adjusting color opacities
+library(scales)
+# generate some heteroskedastic data:
+# set seed for reproducibility
+set.seed(123)
+# set up vector of x coordinates
+x <- rep(c(10, 15, 20, 25), each = 25)
+# initialize vector of errors
+e <- c()
+# sample 100 errors such that the variance increases with x
+e[1:25] <- rnorm(25, sd = 10)
+e[26:50] <- rnorm(25, sd = 15)
+e[51:75] <- rnorm(25, sd = 20)
+e[76:100] <- rnorm(25, sd = 25)
+# set up y
+y <- 720 - 3.3 * x + e
+# Estimate the model
+mod <- lm(y ~ x)
+# Plot the data
+plot(x = x,
+y = y,
+main = "An Example of Heteroskedasticity",
+xlab = "Student-Teacher Ratio",
+ylab = "Test Score",
+cex = 0.5,
+pch = 19,
+xlim = c(8, 27),
+ylim = c(600, 710))
+# Add the regression line to the plot
+abline(mod, col = "darkred")
+# Add boxplots to the plot
+boxplot(formula = y ~ x,
+add = TRUE,
+at = c(10, 15, 20, 25),
+col = alpha("gray", 0.4),
+border = "black")
+```
+For this artificial data it is clear that the conditional error variances differ.
+Specifically, we observe that the variance in test scores (and therefore the variance
+of the errors committed) increases with the student teacher ratio.
+
+#REAL WORLD EXAMPLE OF HETROSKEDASTICITY from wage and education data.
+```{r}
+# load package and attach data
+library(AER)
+data("CPSSWEducation")
+attach(CPSSWEducation)
+```
+```{r}
+summary(CPSSWEducation)
+```
+```{r}
+# estimate a simple regression model
+labor_model <- lm(earnings ~ education)
+summary(labor_model)
+```
+```{r}
+# plot observations and add the regression line
+plot(education,
+earnings,
+ylim = c(0, 150))
+abline(labor_model,
+col = "steelblue",
+lwd = 2)
+```
+
+
+The plot reveals that the mean of the distribution of earnings increases with the
+level of education.
+
+```{r}
+# compute a 95% confidence interval for the coefficients in the model
+confint(labor_model)
+```
+Since the interval is [1.33, 1.60] we can reject the hypothesis that the coefficient on education is zero at the 5% level.
+Furthermore, the plot indicates that there is heteroskedasticity: if we assume the regression line to be a reasonably good representation of the conditional mean function E(earningsi|educationi), the dispersion of hourly earnings around that function clearly increases with the level of education, i.e., the variance of the distribution of earnings increases. In other words: the variance of the errors (the errors made in explaining earnings by education) increases with education so that the regression errors are heteroskedastic.
+```{r}
+#Showing  heteroskedasticity using residual plot  
+CPSSWEducation$resi <- labor_model$residuals
+library(ggplot2)
+ggplot(data = CPSSWEducation, aes(y =resi , x = education)) + geom_point(col = 'blue') + geom_abline(slope = 0)
+```
+
+```{r}
+# compute heteroskedasticity-robust standard errors
+vcov <- vcovHC(linear_model, type = "HC1")
+vcov
+```
+```{r}
+# compute the square root of the diagonal elements in vcov
+robust_se <- sqrt(diag(vcov))
+robust_se
+```
+```{r}
+# we invoke the function `coeftest()` on our model
+coeftest(linear_model, vcov. = vcov)
+```
+We see that the values reported in the column Std. Error are equal those
+from sqrt(diag(vcov)).
+How severe are the implications of using homoskedasticity-only standard errors
+in the presence of heteroskedasticity? The answer is: it depends. As mentioned
+above we face the risk of drawing wrong conclusions when conducting
+significance tests.
+# ANOTHER EXAMPLE OF HETROSKEDASTICITY from wage and education data.
+```{r}
+set.seed(905)
+# generate heteroskedastic data
+X <- 1:500
+Y <- rnorm(n = 500, mean = X, sd = 0.6 * X)
+# estimate a simple regression model
+reg <- lm(Y ~ X)
+# plot the data
+plot(x = X, y = Y,
+pch = 19,
+col = "steelblue",
+cex = 0.8)
+# add the regression line to the plot
+abline(reg,
+col = "darkred",
+lwd = 1.5)
+```
+SR3 states that At each xi the variance of random error component  should be same  but this is not the case here so it is in direct violation of SR3.The plot shows that the data are heteroskedastic as the variance of Y grows with
+X.
+
+```{r}
+# test hypthesis using the default standard error formula
+linearHypothesis(reg, hypothesis.matrix = "X = 1")$'Pr(>F)'[2] < 0.05
+```
+```{r}
+#test hypothesis using the robust standard error formula
+linearHypothesis(reg, hypothesis.matrix = "X = 1", white.adjust = "hc1")$'Pr(>F)'[2] < .05
+```
+This is a good example of what can go wrong if we ignore heteroskedasticity:
+for the data set at hand the default method rejects the null hypothesis 1 = 1
+although it is true. When using the robust standard error formula the test does
+not reject the null. Of course, we could think this might just be a coincidence
+and both tests do equally well in maintaining the type I error rate of 5%.
+
+```{r}
+#checking by Brush Pagan test
+library(lmtest)
+bptest(reg)
+```
+Reject H0 that heteroskedasticity  is not present and conclude that heteroskedasticity is present.
+
+
+
+
+
+
+
+

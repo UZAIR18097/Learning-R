@@ -1,0 +1,304 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+#loading required packages and data
+library(AER)
+library(stargazer)
+library(corrplot)
+library(dplyr)
+data("CASchools")
+```
+Computing confidence intervals for individual coefficients in the multiple regression model proceeds as in the simple regression model using the function
+confint().
+```{r}
+# define variables
+CASchools$STR <- CASchools$students/CASchools$teachers
+CASchools$score <- (CASchools$read + CASchools$math)/2
+```
+```{r}
+model <- lm(score ~ STR + english, data = CASchools)
+confint(model)
+```
+To obtain a confidence Intervals at say 90% just set the argument
+level in our call of confint() accordingly.
+```{r}
+confint(model,level = 0.9)
+```
+Problem with confint()is that it does not use robust standard errors so we have to compute them manually.
+
+```{r}
+library(lmtest) #use the variance estimator in a linear model,
+library(sandwich) # computes robust covariance matrix estimators.
+robust <- lm(score ~ STR + english, data = CASchools)
+coeftest(robust, vcov = vcovHC(robust, type="HC1"))
+```
+```{r}
+# compute robust 95% confidence intervals using robust standard errors
+coefci(robust, vcov. = vcovHC(robust, type = 'HC1'))
+```
+```{r}
+# compute robust 90% confidence intervals
+coefci(robust, vcov. = vcovHC(robust, type = 'HC1'),level = 0.9)
+```
+```{r}
+# scale expenditure to thousands of dollars
+CASchools$expenditure <- CASchools$expenditure/1000
+```
+```{r}
+# estimate the model
+model <- lm(score ~ STR + english + expenditure, data = CASchools)
+coeftest(model, vcov = vcovHC(model, type="HC1"))
+```
+The estimated effect of a one unit change in the student-teacher ratio on test
+scores with expenditure and the share of english learning pupils held constant is −0.29, which is rather small.
+
+What is more, the coefficient on size is not significantly
+different from zero anymore even at 10% since p-value = 0.55.
+The insignificance of ˆ 1 could be due to a larger standard error of ˆ 1 resulting from adding expenditure to the model so that we estimate the coefficient on size less precisely. This illustrates the issue of strongly correlated regressors (imperfect multicollinearity). The correlation between size and expenditure can be computed using cor().
+
+```{r}
+# compute the sample correlation between 'size' and 'expenditure'
+cor(CASchools$STR, CASchools$expenditure)
+```
+Altogether, we conclude that the new model provides no evidence that changing
+the student-teacher ratio, e.g., by hiring new teachers, has any effect on the test scores while keeping expenditures per student and the share of English learners constant.
+
+7.3 Joint Hypothesis Testing Using the FStatistic
+The estimated model is
+TestScore = 649.58− 0.29× size − 0.66× english + 3.87× expenditure.
+
+Now, can we reject the hypothesis that the coefficient on size and the coefficient
+on expenditure are zero? To answer this, we have to resort to joint hypothesis
+tests. A joint hypothesis imposes restrictions on multiple regression coefficients.
+
+It is fairly easy to conduct F-tests in R. We can use the function
+linearHypothesis()contained in the package car.
+
+
+
+```{r}
+# estimate the multiple regression model
+model <- lm(score ~ STR + english + expenditure, data = CASchools)
+# execute the function on the model object and provide both linear restrictions
+# to be tested as strings
+linearHypothesis(model, c("STR=0", "expenditure=0"))
+```
+The output reveals that the F-statistic for this joint hypothesis test is about
+8.01 and the corresponding p-value is 0.0004. Thus, we can reject the null
+hypothesis that both coefficients are zero at any level of significance commonly
+used in practice.
+
+```{r}
+# heteroskedasticity-robust F-test
+linearHypothesis(model, c("STR=0", "expenditure=0"), white.adjust = "hc1")
+```
+The null hypothesis belonging to this F-test is that all
+of the population coefficients in the model except for the intercept are zero, so the hypotheses are 
+H0 : B1 = 0, B2 = 0, B3 = 0 vs. H1 : Bj 6= 0 for at least one j = 1, 2, 3.
+This is also called the overall regression F-statistic and the null hypothesis is obviously different from testing if only B1 and B3 are zero.
+
+```{r}
+# execute the function on the model object and provide the restrictions
+# to be tested as a character vector
+linearHypothesis(model, c("STR=0", "english=0", "expenditure=0"))
+```
+```{r}
+summary(model)$fstatistic
+```
+The entry value is the overall F-statistics and it equals the result of
+linearHypothesis(). The F-test rejects the null hypothesis that the model
+has no power in explaining test scores. It is important to know that the
+F-statistic reported by summary is not robust to heteroskedasticity!
+###############################################################################
+7.4 Confidence Sets for Multiple Coefficients
+
+```{r}
+# draw the 95% confidence set for coefficients on size and expenditure
+confidenceEllipse(model,
+fill = T,
+lwd = 0,
+which.coef = c("STR", "expenditure"),
+main = "95% Confidence Set")
+```
+We see that the ellipse is centered around (−0.29, 3.87), the pair of coefficients estimates on size and expenditure. What is more, (0, 0) is not element of the 95% confidence set so that we can reject H0 : B1 = 0, B3 = 0.
+
+
+```{r}
+# draw the robust 95% confidence set for coefficients on size and expenditure
+confidenceEllipse(model,
+fill = T,
+lwd = 0,
+which.coef = c("STR", "expenditure"),
+main = "95% Confidence Sets",
+vcov. = vcovHC(model, type = "HC1"),
+col = "red")
+# draw the 95% confidence set for coefficients on size and expenditure
+confidenceEllipse(model,
+fill = T,
+lwd = 0,
+which.coef = c("STR", "expenditure"),
+add = T)
+```
+As the robust standard errors are slightly larger than those valid under homoskedasticity only in this case, the robust confidence set is slightly larger.This is analogous to the confidence intervals for the individual coefficients.
+##############################################################################
+7.5 Model Specification for Multiple Regression
+
+```{r}
+# estimate the model and print the summary to console
+model <- lm(score ~ STR + english + lunch, data = CASchools)
+coeftest(model, vcov. = vcovHC, type = "HC1")
+```
+We observe no substantial changes in the conclusion about the effect of size on
+TestScore: the coefficient on size changes by only 0.1 and retains its significance.
+
+```{r}
+# set seed for reproducibility
+#creating new variable parking space 
+set.seed(1)
+# generate observations for parking lot space
+CASchools$PLS <- c(22 * CASchools$income
+- 15 * CASchools$STR
++ 0.2 * CASchools$expenditure
++ rnorm(nrow(CASchools), sd = 80) + 3000)
+```
+
+```{r}
+# plot parking lot space against test score
+plot(CASchools$PLS,
+CASchools$score,
+xlab = "Parking Lot Space",
+ylab = "Test Score",
+pch = 20,
+col = "steelblue")
+```
+```{r}
+# regress test score on PLS
+summary(lm(score ~ PLS, data = CASchools))
+```
+we find that the coefficient on PLS is positive and significantly
+different from zero. Also R2 and ¯R2 are about 0.3 which is a lot more than
+the roughly 0.05 observed when regressing the test scores on the class sizes
+only. This suggests that increasing the parking lot space boosts a school’s test scores and that model (7.1) does even better in explaining heterogeneity in the
+dependent variable than a model with size as the only regressor.It is evident that the high R2 cannot be used to the conclude that the estimated relation between parking lot space and test scores is causal: the (relatively) high R2 is due to correlation between PLS and other determinants and/or control variables.
+Increasing parking lot space is not an appropriate measure to generate more
+learning success!
+#########################################################################
+7.6 Analysis of the Test Score Data Set
+
+Another new variable provided with CASchools is calworks, the percentage of
+students that qualify for the CalWorks income assistance program.
+
+```{r}
+# estimate the correlation between 'calworks' and 'lunch'
+cor(CASchools$calworks, CASchools$lunch)
+```
+There is no unambiguous way to proceed when deciding which variable to use.
+In any case it may not a good idea to use both variables as regressors in view
+of collinearity. Therefore, we also consider alternative model specifications.
+
+
+```{r}
+# set up arrangement of plots
+m <- rbind(c(1, 2), c(3, 0))
+graphics::layout(mat = m)
+# scatterplots
+plot(score ~ english,
+data = CASchools,
+col = "steelblue",
+pch = 20,
+xlim = c(0, 100),
+cex.main = 0.9,
+main = "Percentage of English language learners")
+plot(score ~ lunch,
+data = CASchools,
+col = "steelblue",
+pch = 20,
+cex.main = 0.9,
+main = "Percentage qualifying for reduced price lunch")
+plot(score ~ calworks,
+data = CASchools,
+col = "steelblue",
+pch = 20,
+xlim = c(0, 100),
+cex.main = 0.9,
+main = "Percentage qualifying for income assistance")
+```
+```{r}
+# estimate correlation between student characteristics and test scores
+cor(CASchools$score, CASchools$english)
+#> [1] -0.6441238
+cor(CASchools$score, CASchools$lunch)
+#> [1] -0.868772
+cor(CASchools$score, CASchools$calworks)
+```
+We see that all relationships are negative.
+
+Modelling with five different models
+
+```{r}
+# load the stargazer library
+library(stargazer)
+# estimate different model specifications
+spec1 <- lm(score ~ STR, data = CASchools)
+spec2 <- lm(score ~ STR + english, data = CASchools)
+spec3 <- lm(score ~ STR + english + lunch, data = CASchools)
+spec4 <- lm(score ~ STR + english + calworks, data = CASchools)
+spec5 <- lm(score ~ STR + english + lunch + calworks, data = CASchools)
+# gather robust standard errors in a list
+rob_se <- list(sqrt(diag(vcovHC(spec1, type = "HC1"))),
+sqrt(diag(vcovHC(spec2, type = "HC1"))),
+sqrt(diag(vcovHC(spec3, type = "HC1"))),
+sqrt(diag(vcovHC(spec4, type = "HC1"))),
+sqrt(diag(vcovHC(spec5, type = "HC1"))))
+# generate a LaTeX table using stargazer
+stargazer(spec1, spec2, spec3, spec4, spec5,se = rob_se,
+digits = 3,
+header = F,
+type = "text",
+title = "RESULTS",
+align=TRUE,
+column.labels = c("(I)", "(II)", "(III)", "(IV)", "(V)"))
+```
+```{r}
+stargazer(CASchools,type = "text")
+```
+```{r}
+#producing more publishable report of results
+stargazer(spec1, spec2, spec3, spec4, spec5,se = rob_se,
+digits = 3,
+header = F,
+type = "text",
+title = "RESULTS",
+dep.var.labels=c("Score"),
+align=TRUE,
+covariate.labels=c("Size","English","Lunch","Calworks","Constant"),
+omit.stat=c("LL","ser","f"), 
+no.space=TRUE,
+column.labels = c("Model 1", "Model 2", "Model 3", "Model 4", "Model 5"))
+```
+```{r}
+#With Confidence Interval
+#producing more publishable report of results
+stargazer(spec1, spec2, spec3, spec4, spec5,se = rob_se,
+digits = 3,
+header = F,
+type = "html",
+title = "RESULTS",
+dep.var.labels=c("Score"),
+align=TRUE,
+covariate.labels=c("Size","English","Lunch","Calworks","Constant"),
+no.space=TRUE,ci=TRUE, ci.level=0.90,
+column.labels = c("Model 1", "Model 2", "Model 3", "Model 4", "Model 5"),
+out = "RESULTS.html")
+```
+Let us create a table that contains the correlation matrix for data
+```{r}
+correlation.matrix <- cor(CASchools[, sapply(CASchools, is.numeric)],
+    use = "complete.obs", method = "pearson")
+
+stargazer(correlation.matrix, title="Correlation Matrix", type = "text",out="Corr_matrix.docx")
+```
+
