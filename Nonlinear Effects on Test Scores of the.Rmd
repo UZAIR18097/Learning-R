@@ -1,0 +1,173 @@
+---
+title: "Nonlinear Effects on Test Scores of the
+Student-Teacher Ratio"
+output: html_notebook
+---
+Nonlinear Regression Models of Test Scores
+```{r}
+library(AER)
+library(scales)
+library(stargazer)
+```
+```{r}
+# load the `CASchools` dataset
+data(CASchools)
+# add student-teacher ratio
+CASchools$size <- CASchools$students/CASchools$teachers
+# add average test-score
+CASchools$score <- (CASchools$read + CASchools$math)/2
+# append HiSTR to CASchools
+CASchools$HiSTR <- as.numeric(CASchools$size >= 20)
+# append HiEL to CASchools
+CASchools$HiEL <- as.numeric(CASchools$english >= 10)
+```
+```{r}
+# estimate all models
+TestScore_mod1 <- lm(score ~ size + english + lunch, data = CASchools)
+
+TestScore_mod2 <- lm(score ~ size + english + lunch + log(income), data = CASchools)
+
+TestScore_mod3 <- lm(score ~ size + HiEL + HiEL:size, data = CASchools)
+
+TestScore_mod4 <- lm(score ~ size + HiEL + HiEL:size + lunch + log(income), data = CASchools)
+
+TestScore_mod5 <- lm(score ~ size + I(size^2) + I(size^3) + HiEL + lunch + log(income), 
+    data = CASchools)
+
+TestScore_mod6 <- lm(score ~ size + I(size^2) + I(size^3) + HiEL + HiEL:size + HiEL:I(size^2) + 
+    HiEL:I(size^3) + lunch + log(income), data = CASchools)
+
+TestScore_mod7 <- lm(score ~ size + I(size^2) + I(size^3) + english + lunch + log(income), 
+    data = CASchools)
+```
+```{r}
+# gather robust standard errors in a list
+rob_se <- list(sqrt(diag(vcovHC(TestScore_mod1, type = "HC1"))),
+sqrt(diag(vcovHC(TestScore_mod2, type = "HC1"))),
+sqrt(diag(vcovHC(TestScore_mod3, type = "HC1"))),
+sqrt(diag(vcovHC(TestScore_mod4, type = "HC1"))),
+sqrt(diag(vcovHC(TestScore_mod5, type = "HC1"))),
+sqrt(diag(vcovHC(TestScore_mod6, type = "HC1"))),
+sqrt(diag(vcovHC(TestScore_mod7, type = "HC1"))))
+```
+
+```{r}
+# generate a LaTeX table of regression outputs
+stargazer(TestScore_mod1,
+TestScore_mod2,
+TestScore_mod3,
+TestScore_mod4,
+TestScore_mod5,
+TestScore_mod6,
+TestScore_mod7,
+digits = 1,
+dep.var.caption = "Dependent Variable: Test Score",
+se = rob_se,column.sep.width = "1pt",
+type = "text",
+title = "RESULTS",
+align=TRUE,
+out = "Non-Effects Results.txt")
+```
+```{r}
+# check joint significance of the interaction terms
+linearHypothesis(TestScore_mod6,
+c("size:HiEL=0", "I(size^2):HiEL=0", "I(size^3):HiEL=0"),
+vcov. = vcovHC, type = "HC1")
+```
+```{r}
+# scatterplot
+plot(CASchools$size,
+CASchools$score,
+xlim = c(12, 28),
+ylim = c(600, 740),
+pch = 20,
+col = "gray",
+xlab = "Student-Teacher Ratio",
+ylab = "Test Score")
+
+# add a legend
+legend("top",
+legend = c("Linear Regression (2)",
+"Cubic Regression (5)",
+"Cubic Regression (7)"),
+cex = 0.8,
+ncol = 3,
+lty = c(1, 1, 2),
+col = c("blue", "red", "black"))
+
+# data for use with predict()
+new_data <- data.frame("size" = seq(16, 24, 0.05),
+"english" = mean(CASchools$english),
+"lunch" = mean(CASchools$lunch),
+"income" = mean(CASchools$income),
+"HiEL" = mean(CASchools$HiEL))
+
+# add estimated regression function for model (2)
+fitted <- predict(TestScore_mod2, newdata = new_data)
+lines(new_data$size,
+fitted,
+lwd = 1.5,
+col = "blue")
+# add estimated regression function for model (5)
+fitted <- predict(TestScore_mod5, newdata = new_data)
+lines(new_data$size,
+fitted,
+lwd = 1.5,
+col = "red")
+# add estimated regression function for model (7)
+fitted <- predict(TestScore_mod7, newdata = new_data)
+lines(new_data$size,
+fitted,
+col = "black",
+lwd = 1.5,
+lty = 2)
+```
+
+```{r}
+# draw scatterplot
+# observations with HiEL = 0
+plot(CASchools$size[CASchools$HiEL == 0],
+CASchools$score[CASchools$HiEL == 0],
+xlim = c(12, 28),
+ylim = c(600, 730),
+pch = 20,
+col = "gray",
+xlab = "Student-Teacher Ratio",
+ylab = "Test Score")
+
+# observations with HiEL = 1
+points(CASchools$size[CASchools$HiEL == 1],
+CASchools$score[CASchools$HiEL == 1],
+col = "steelblue",
+pch = 20)
+
+# add a legend
+legend("top",
+legend = c("Regression (6) with HiEL=0", "Regression (6) with HiEL=1"),
+cex = 0.7,ncol = 2,
+lty = c(1, 1),
+col = c("green", "red"))
+
+# data for use with 'predict()'
+new_data <- data.frame("size" = seq(12, 28, 0.05),
+"english" = mean(CASchools$english),
+"lunch" = mean(CASchools$lunch),
+"income" = mean(CASchools$income),
+"HiEL" = 0)
+
+# add estimated regression function for model (6) with HiEL=0
+fitted <- predict(TestScore_mod6, newdata = new_data)
+lines(new_data$size,
+fitted,
+lwd = 1.5,
+col = "green")
+
+# add estimated regression function for model (6) with HiEL=1
+new_data$HiEL <- 1
+fitted <- predict(TestScore_mod6, newdata = new_data)
+lines(new_data$size,
+fitted,
+lwd = 1.5,
+col = "red")
+```
+
